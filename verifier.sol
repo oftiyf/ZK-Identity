@@ -68,6 +68,16 @@ contract Groth16Verifier {
 
     uint16 constant pLastMem = 896;
 
+// 这里的_pubSignals数组内内容解释一下，方便开发的时候使用
+// 1.collegeId：学院ID
+// 2.merkleRoot：Merkle树的根哈希值
+// 3.validityTimestamp：有效时间戳
+// 4.commitment：承诺值
+//      由studentId和secret计算得出的哈希值
+//      用于后续验证和隐私保护
+// 5.nullifier：防重放值（参考tornado cash）
+//      由secret和commitment计算得出的哈希值
+//      用于防止重复使用同一个证明
     function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) public view returns (bool) {
         assembly {
             function checkField(v) {
