@@ -1,8 +1,7 @@
 pragma circom 2.0.0;
 
 include "../node_modules/circomlib/circuits/bitify.circom";
-include "../node_modules/circomlib/circuits/pedersen.circom";
-include "../node_modules/circomlib/circuits/mimc.circom";  // 改用mimc
+include "../node_modules/circomlib/circuits/mimc.circom";
 
 template HashLeftRight() {
     signal input left;
@@ -12,10 +11,39 @@ template HashLeftRight() {
     component hasher = MiMC7(2);
     hasher.x_in <== left;
     hasher.k <== right;
-    hash <== hasher.out;  // MiMC7使用x_in, k和out作为信号名
+    hash <== hasher.out;
 }
 
-template DualMux() {
+template MerkleTreeChecker(levels) {
+    signal input leaf;
+    signal input root;
+    signal input pathElements[levels];
+    signal input pathIndices[levels];
+
+
+    component selectors[levels];
+    component hashers[levels];
+
+    signal currentHash[levels + 1];
+    currentHash[0] <== leaf;
+
+    for (var i = 0; i < levels; i++) {
+        selectors[i] = Selector();
+        selectors[i].in[0] <== currentHash[i];
+        selectors[i].in[1] <== pathElements[i];
+        selectors[i].s <== pathIndices[i];
+
+        hashers[i] = HashLeftRight();
+        hashers[i].left <== selectors[i].out[0];
+        hashers[i].right <== selectors[i].out[1];
+
+        currentHash[i + 1] <== hashers[i].hash;
+    }
+
+    root === currentHash[levels];
+}
+
+template Selector() {
     signal input in[2];
     signal input s;
     signal output out[2];
@@ -25,72 +53,65 @@ template DualMux() {
     out[1] <== (in[0] - in[1])*s + in[1];
 }
 
-template MerkleTreeChecker(levels) {
-    signal input leaf;
-    signal input root;
-    signal input pathElements[levels];
-    signal input pathIndices[levels];
 
-    component selectors[levels];
-    component hashers[levels];
+template MiMC7Hash3() {
+    signal input in1;
+    signal input in2;
+    signal input in3;
+    signal output out;
 
-    for (var i = 0; i < levels; i++) {
-        selectors[i] = DualMux();
-        selectors[i].in[0] <== i == 0 ? leaf : hashers[i - 1].hash;
-        selectors[i].in[1] <== pathElements[i];
-        selectors[i].s <== pathIndices[i];
+    // 第一次哈希：hash(in1, in2)
+    component hasher1 = MiMC7(2);
+    hasher1.x_in <== in1;
+    hasher1.k <== in2;
 
-        hashers[i] = HashLeftRight();
-        hashers[i].left <== selectors[i].out[0];
-        hashers[i].right <== selectors[i].out[1];
-    }
+    // 第二次哈希：hash(hash(in1, in2), in3)
+    component hasher2 = MiMC7(2);
+    hasher2.x_in <== hasher1.out;
+    hasher2.k <== in3;
 
-    root === hashers[levels - 1].hash;
+    // 输出最终哈希值
+    out <== hasher2.out;
 }
 
-template StudentCommitmentHasher() {
-    signal input studentId;
+template CommitmentHasher() {
+    signal input nullifier;
     signal input secret;
+    signal input studentid;
     signal output commitment;
-    signal output studentIdHash;
+    signal output nullifierHash;
 
-    component commitmentHasher = Pedersen(496);
-    component studentIdHasher = Pedersen(248);
-    component studentIdBits = Num2Bits(248);
-    component secretBits = Num2Bits(248);
-    
-    studentIdBits.in <== studentId;
-    secretBits.in <== secret;
-    
-    for (var i = 0; i < 248; i++) {
-        studentIdHasher.in[i] <== studentIdBits.out[i];
-        commitmentHasher.in[i] <== studentIdBits.out[i];
-        commitmentHasher.in[i + 248] <== secretBits.out[i];
-    }
+    // 使用MiMC7计算commitment (commitment = hash(nullifier, secret))
+    component commitmentHasher = MiMC7Hash3();
+    commitmentHasher.in1 <== secret;
+    commitmentHasher.in2 <== studentid;
+    commitmentHasher.in3 <== nullifier;
+    commitment <== commitmentHasher.out;
 
-    commitment <== commitmentHasher.out[0];
-    studentIdHash <== studentIdHasher.out[0];
+    // 使用MiMC7计算nullifierHash (nullifierHash = hash(nullifier))
+    component nullifierHasher = MiMC7(1);
+    nullifierHasher.x_in <== nullifier;
+    nullifierHasher.k <== 0;  // 使用0作为第二个输入
+    nullifierHash <== nullifierHasher.out;
 }
 
-template StudentVerifier(levels) {
-    // 公开输入
-    signal input root;         // Merkle树根
-    signal input collegeId;    // 学院ID
-    signal input studentIdHash;// 学生ID哈希
+template Student(levels) {
+    signal input root;          
+    signal input nullifierHash; 
+    signal input collegeId;     
+    
     signal input studentId;
     signal input secret;
-    signal input collegeKey;
     signal input pathElements[levels];
     signal input pathIndices[levels];
-
-    signal output commitment;
-    signal output nullifier;
-    component hasher = StudentCommitmentHasher();
-    hasher.studentId <== studentId;
+    signal input nullifier;
+//下面检查提供的nullifierhash和隐私输入的nullifier是否正确符合，并生成commitment
+    component hasher = CommitmentHasher();
+    hasher.nullifier <== nullifier;
     hasher.secret <== secret;
-    hasher.studentIdHash === studentIdHash;
-    commitment <== hasher.commitment;
-
+    hasher.studentid <== studentId;
+    hasher.nullifierHash === nullifierHash;
+//下面检查是否在哈希树里面
     component tree = MerkleTreeChecker(levels);
     tree.leaf <== hasher.commitment;
     tree.root <== root;
@@ -99,22 +120,8 @@ template StudentVerifier(levels) {
         tree.pathIndices[i] <== pathIndices[i];
     }
 
-    component nullifierHasher = Pedersen(496);
-    component nullifierInputBits = Num2Bits(248);
-    component commitmentBits = Num2Bits(248);
-    
-    nullifierInputBits.in <== secret;
-    commitmentBits.in <== commitment;
-    
-    for (var i = 0; i < 248; i++) {
-        nullifierHasher.in[i] <== nullifierInputBits.out[i];
-        nullifierHasher.in[i + 248] <== commitmentBits.out[i];
-    }
-    
-    nullifier <== nullifierHasher.out[0];
-
     signal collegeIdSquare;
     collegeIdSquare <== collegeId * collegeId;
 }
 
-component main {public [root, collegeId, studentIdHash]} = StudentVerifier(20);
+component main {public [root, nullifierHash, collegeId]} = Student(20);
