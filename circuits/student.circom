@@ -1,83 +1,120 @@
 pragma circom 2.0.0;
 
-include "../node_modules/circomlib/circuits/poseidon.circom";
-include "../node_modules/circomlib/circuits/comparators.circom";
-include "../node_modules/circomlib/circuits/mux1.circom";
+include "../node_modules/circomlib/circuits/bitify.circom";
+include "../node_modules/circomlib/circuits/pedersen.circom";
+include "../node_modules/circomlib/circuits/mimc.circom";  // 改用mimc
 
-template MerkleTreeNode() {
+template HashLeftRight() {
     signal input left;
     signal input right;
     signal output hash;
 
-    component hasher = Poseidon(2);
-    hasher.inputs[0] <== left;
-    hasher.inputs[1] <== right;
-    hash <== hasher.out;
+    component hasher = MiMC7(2);
+    hasher.x_in <== left;
+    hasher.k <== right;
+    hash <== hasher.out;  // MiMC7使用x_in, k和out作为信号名
 }
 
-template StudentVerifier(merkleTreeDepth) {
-    // 私有输入
-    signal input studentId;    
-    signal input secret;      
-    signal input collegeKey;   
-    signal input merklePathElements[merkleTreeDepth];
-    signal input merklePathIndices[merkleTreeDepth];
-    
-    signal input collegeId;          
-    signal input merkleRoot;        
-    signal input validityTimestamp;   
-    signal output commitment;        
-    signal output nullifier;         
+template DualMux() {
+    signal input in[2];
+    signal input s;
+    signal output out[2];
 
-    // 1. 计算学生ID的哈希作为叶子节点
-    component leafHasher = Poseidon(1);
-    leafHasher.inputs[0] <== studentId;
-    
-    // 2. 验证merkle路径
-    component nodes[merkleTreeDepth];
-    component muxLeft[merkleTreeDepth];
-    component muxRight[merkleTreeDepth];
-    signal computedHash[merkleTreeDepth + 1];
-    
-    computedHash[0] <== leafHasher.out;
-    
-    for (var i = 0; i < merkleTreeDepth; i++) {
-        nodes[i] = MerkleTreeNode();
-        muxLeft[i] = Mux1();
-        muxRight[i] = Mux1();
-        muxLeft[i].s <== merklePathIndices[i];
-        muxLeft[i].c[0] <== computedHash[i];
-        muxLeft[i].c[1] <== merklePathElements[i];
+    s * (1 - s) === 0;
+    out[0] <== (in[1] - in[0])*s + in[0];
+    out[1] <== (in[0] - in[1])*s + in[1];
+}
 
-        muxRight[i].s <== merklePathIndices[i];
-        muxRight[i].c[0] <== merklePathElements[i];
-        muxRight[i].c[1] <== computedHash[i];
-        
-        nodes[i].left <== muxLeft[i].out;
-        nodes[i].right <== muxRight[i].out;
-        
-        computedHash[i + 1] <== nodes[i].hash;
+template MerkleTreeChecker(levels) {
+    signal input leaf;
+    signal input root;
+    signal input pathElements[levels];
+    signal input pathIndices[levels];
+
+    component selectors[levels];
+    component hashers[levels];
+
+    for (var i = 0; i < levels; i++) {
+        selectors[i] = DualMux();
+        selectors[i].in[0] <== i == 0 ? leaf : hashers[i - 1].hash;
+        selectors[i].in[1] <== pathElements[i];
+        selectors[i].s <== pathIndices[i];
+
+        hashers[i] = HashLeftRight();
+        hashers[i].left <== selectors[i].out[0];
+        hashers[i].right <== selectors[i].out[1];
+    }
+
+    root === hashers[levels - 1].hash;
+}
+
+template StudentCommitmentHasher() {
+    signal input studentId;
+    signal input secret;
+    signal output commitment;
+    signal output studentIdHash;
+
+    component commitmentHasher = Pedersen(496);
+    component studentIdHasher = Pedersen(248);
+    component studentIdBits = Num2Bits(248);
+    component secretBits = Num2Bits(248);
+    
+    studentIdBits.in <== studentId;
+    secretBits.in <== secret;
+    
+    for (var i = 0; i < 248; i++) {
+        studentIdHasher.in[i] <== studentIdBits.out[i];
+        commitmentHasher.in[i] <== studentIdBits.out[i];
+        commitmentHasher.in[i + 248] <== secretBits.out[i];
+    }
+
+    commitment <== commitmentHasher.out[0];
+    studentIdHash <== studentIdHasher.out[0];
+}
+
+template StudentVerifier(levels) {
+    // 公开输入
+    signal input root;         // Merkle树根
+    signal input collegeId;    // 学院ID
+    signal input studentIdHash;// 学生ID哈希
+    signal input studentId;
+    signal input secret;
+    signal input collegeKey;
+    signal input pathElements[levels];
+    signal input pathIndices[levels];
+
+    signal output commitment;
+    signal output nullifier;
+    component hasher = StudentCommitmentHasher();
+    hasher.studentId <== studentId;
+    hasher.secret <== secret;
+    hasher.studentIdHash === studentIdHash;
+    commitment <== hasher.commitment;
+
+    component tree = MerkleTreeChecker(levels);
+    tree.leaf <== hasher.commitment;
+    tree.root <== root;
+    for (var i = 0; i < levels; i++) {
+        tree.pathElements[i] <== pathElements[i];
+        tree.pathIndices[i] <== pathIndices[i];
+    }
+
+    component nullifierHasher = Pedersen(496);
+    component nullifierInputBits = Num2Bits(248);
+    component commitmentBits = Num2Bits(248);
+    
+    nullifierInputBits.in <== secret;
+    commitmentBits.in <== commitment;
+    
+    for (var i = 0; i < 248; i++) {
+        nullifierHasher.in[i] <== nullifierInputBits.out[i];
+        nullifierHasher.in[i + 248] <== commitmentBits.out[i];
     }
     
-    computedHash[merkleTreeDepth] === merkleRoot;
-    component collegeVerifier = Poseidon(2);
-    collegeVerifier.inputs[0] <== studentId;
-    collegeVerifier.inputs[1] <== collegeKey;
+    nullifier <== nullifierHasher.out[0];
 
-    component commitmentHasher = Poseidon(2);
-    commitmentHasher.inputs[0] <== studentId;
-    commitmentHasher.inputs[1] <== secret;
-    commitment <== commitmentHasher.out;
-
-    component nullifierHasher = Poseidon(2);
-    nullifierHasher.inputs[0] <== secret;
-    nullifierHasher.inputs[1] <== commitment;
-    nullifier <== nullifierHasher.out;
-
-    component timeCheck = GreaterEqThan(32);
-    timeCheck.in[0] <== validityTimestamp;
-    timeCheck.in[1] <== 0;
-    timeCheck.out === 1;
+    signal collegeIdSquare;
+    collegeIdSquare <== collegeId * collegeId;
 }
 
-component main {public [collegeId, merkleRoot, validityTimestamp]} = StudentVerifier(4);
+component main {public [root, collegeId, studentIdHash]} = StudentVerifier(20);
