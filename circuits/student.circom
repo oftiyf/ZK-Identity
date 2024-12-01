@@ -2,6 +2,7 @@ pragma circom 2.0.0;
 
 include "../node_modules/circomlib/circuits/bitify.circom";
 include "../node_modules/circomlib/circuits/mimc.circom";
+include "../node_modules/circomlib/circuits/comparators.circom";
 
 template HashLeftRight() {
     signal input left;
@@ -98,7 +99,8 @@ template CommitmentHasher() {
 template Student(levels) {
     signal input root;          
     signal input nullifierHash; 
-    signal input collegeId;     
+    signal input collegeId;  
+    signal input newcommitment; 
     
     signal input studentId;
     signal input secret;
@@ -111,6 +113,13 @@ template Student(levels) {
     hasher.secret <== secret;
     hasher.studentid <== studentId;
     hasher.nullifierHash === nullifierHash;
+// 检查新的commitment不能与旧的commitment相同
+    signal diff;
+    diff <== hasher.commitment - newcommitment;
+
+    component isZero = IsZero();
+    isZero.in <== diff;
+    1 - isZero.out === 1; // 确保diff不为0
 //下面检查是否在哈希树里面
     component tree = MerkleTreeChecker(levels);
     tree.leaf <== hasher.commitment;
@@ -124,4 +133,4 @@ template Student(levels) {
     collegeIdSquare <== collegeId * collegeId;
 }
 
-component main {public [root, nullifierHash, collegeId]} = Student(20);
+component main {public [root, nullifierHash, collegeId,newcommitment]} = Student(20);
