@@ -13,8 +13,9 @@
 - 证明学生属于特定学院，无需披露具体身份
 - 基于Circom实现核心电路
 - 智能合约验证整合
-![alt text](efeaca3131f21a01334432789a0d1ff4.png)
-
+![alt text](student-verify/mmexport1732964022083.png)
+### 前端
+![alt text](image.png)
 ## 未来规划
 
 ### 近期目标
