@@ -6,42 +6,84 @@ import "./merkle_tree.sol";
 import "./pure_verifier.sol";
 
 
-contract mianverfier{
-    //这个映射还要求返回区块数
+contract mianverfier is MerkleTree, Groth16Verifier {
+    
     event passed(address indexed recipient, bytes32 nullifierHash, bytes32 newCommitment, uint256 blockNumber);
-    //写一个映射，地址到bool值的
     mapping(address => bool) public passed_address;
-    //写一个映射，地址到区块数的
     mapping(address => uint256) public passed_block;
-    function withdraw(
-        bytes32 _nullifierHash,      // 用于防止双重支付的 nullifier
-        bytes32 _newCommitment,      // 新的承诺值（新的叶子节点）
+    mapping(bytes32 => bool) public nullifierHashes;
+    mapping(address => bool) public admins;
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "Only admin can perform this action");
+        _;
+    }
+
+    constructor() public {
+        admins[msg.sender] = true; // 部署合约的地址设为初始管理员
+    }
+
+    function prover(
         uint256[8] memory _proof,    // 零知识证明
-        bytes32[] memory _path,      // Merkle路径
-        uint32[] memory _positions   // 路径位置
+        bytes32 _root,               // merkle树根
+        bytes32 _nullifierHash,      // 用于防止双重支付的 nullifier
+        uint256 _collegeId,         // 学院ID
+        bytes32 _newCommitment,      // 新的承诺值（新的叶子节点）
+        address payable prover   // 接收者地址
     ) external {
+        // 验证零知识证明
+        //root nullifierHash collegeId newcommitment
+        require(
+            verifyProof(
+                _proof,
+                [
+                    uint256(_root),
+                    uint256(_nullifierHash),
+                    uint256(_collegeId),
+                    uint256(_newCommitment)
+                ]
+            ),
+            "Invalid proof"
+        );
+        
+        // 验证merkle树根
+        require(getRoot() == uint256(_root), "Invalid root");
+        
+        // 验证nullifier是否已使用
         require(!nullifierHashes[_nullifierHash], "The note has been already spent");
-        require(!_newnullifierHashes[_newCommitment], "Used nullifierhashers");
+        require(!nullifierHashes[_newCommitment], "Used nullifierhashers");
         
         // 标记 nullifier 为已使用
         nullifierHashes[_nullifierHash] = true;
         
         // 插入新的承诺到 Merkle 树
-        merkleTree.insert(_newCommitment);
+        insert(uint256(_newCommitment));
         
-        // 触发提款事件
-        emit passed(msg.sender, _nullifierHash, _newCommitment, block.number);
-        passed_address[msg.sender] = true;
-        passed_block[msg.sender] = block.number;
+        // 触发事件
+        emit passed(prover, _nullifierHash, _newCommitment, block.number);
+        passed_address[prover] = true;
+        passed_block[prover] = block.number;
     }
-    //写一个函数能够检查指定的地址是否在最近20个区块内通过
+
     function check_passed(address _address) public view returns (bool) {
         return passed_address[_address] && passed_block[_address] >= block.number - 20;
     }
 
+    function adminInsertLeaf(uint256 _leaf) external onlyAdmin {
+        require(!isKnownLeaf[_leaf], "Leaf already exists");
+        insert(_leaf);
+    }
 
+    function addAdmin(address _newAdmin) external onlyAdmin {
+        require(!admins[_newAdmin], "Address is already an admin");
+        admins[_newAdmin] = true;
+    }
 
+    function removeAdmin(address _admin) external onlyAdmin {
+        require(admins[_admin], "Address is not an admin");
+        require(_admin != msg.sender, "Admin cannot remove themselves");
+        admins[_admin] = false;
+    }
 
-    // 默认的fallback函数
     function() external payable {}
 }

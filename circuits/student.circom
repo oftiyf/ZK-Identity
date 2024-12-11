@@ -56,9 +56,10 @@ template Selector() {
 
 
 template MiMC7Hash3() {
-    signal input in1;
-    signal input in2;
-    signal input in3;
+    //实际上是hash(hash(secret,studentid),nullifier)
+    signal input in1;//secret
+    signal input in2;//studentid
+    signal input in3;//nullifier
     signal output out;
 
     // 第一次哈希：hash(in1, in2)

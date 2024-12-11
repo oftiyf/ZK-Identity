@@ -65,7 +65,10 @@ contract Groth16Verifier {
 
     uint16 constant pLastMem = 896;
 
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[4] calldata _pubSignals) public view returns (bool) {
+    function verifyProof(uint[8] memory _proof, uint[4] memory _pubSignals) public view returns (bool) {
+        uint[2] memory _pA = [_proof[0], _proof[1]];
+        uint[2][2] memory _pB = [[_proof[2], _proof[3]], [_proof[4], _proof[5]]];
+        uint[2] memory _pC = [_proof[6], _proof[7]];
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
