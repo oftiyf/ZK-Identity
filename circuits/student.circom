@@ -98,6 +98,8 @@ template CommitmentHasher() {
 }
 
 template Student(levels) {
+    // 输入的参数和顺序为
+    // root nullifierHash collegeId newcommitment studentId secret pathElements pathIndices nullifier   
     signal input root;          
     signal input nullifierHash; 
     signal input collegeId;  

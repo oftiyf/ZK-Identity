@@ -30,7 +30,7 @@ contract mianverfier is MerkleTree, Groth16Verifier {
         uint256 _collegeId,         // 学院ID
         bytes32 _newCommitment,      // 新的承诺值（新的叶子节点）
         address payable prover   // 接收者地址
-    ) external {
+    ) external returns (uint256) {
         // 验证零知识证明
         //root nullifierHash collegeId newcommitment
         require(
@@ -57,12 +57,14 @@ contract mianverfier is MerkleTree, Groth16Verifier {
         nullifierHashes[_nullifierHash] = true;
         
         // 插入新的承诺到 Merkle 树
-        insert(uint256(_newCommitment));
+        uint256 insertedIndex = insert(uint256(_newCommitment));
         
         // 触发事件
         emit passed(prover, _nullifierHash, _newCommitment, block.number);
         passed_address[prover] = true;
         passed_block[prover] = block.number;
+
+        return insertedIndex;
     }
 
     function check_passed(address _address) public view returns (bool) {
