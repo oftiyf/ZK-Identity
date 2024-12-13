@@ -91,7 +91,7 @@ template CommitmentHasher() {
     commitment <== commitmentHasher.out;
 
     // 使用MiMC7计算nullifierHash (nullifierHash = hash(nullifier))
-    component nullifierHasher = MiMC7(1);
+    component nullifierHasher = MiMC7(2);
     nullifierHasher.x_in <== nullifier;
     nullifierHasher.k <== 0;  // 使用0作为第二个输入
     nullifierHash <== nullifierHasher.out;

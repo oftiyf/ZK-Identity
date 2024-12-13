@@ -1,26 +1,3 @@
-/*
- * 这个文件是一个WebAssembly见证计算器的实现。
- * 主要功能:
- * 1. 编译和实例化WebAssembly模块
- * 2. 计算电路的见证值(witness)
- * 3. 处理输入信号并生成见证值
- * 4. 提供二进制和WTNS格式的见证值输出
- * 
- * 这个计算器被用于零知识证明系统中,用来计算电路的见证值,
- * 是生成零知识证明的重要组成部分。
- * 
- * 使用方法:
- * 1. 首先需要准备电路的WASM代码
- * 2. 调用builder函数创建计算器实例:
- *    const calculator = await builder(wasmCode);
- * 3. 准备输入数据,格式为对象,包含所有输入信号
- * 4. 调用计算器方法生成见证值:
- *    - calculateWitness(): 返回见证值数组
- *    - calculateBinWitness(): 返回二进制格式见证值
- *    - calculateWTNSBin(): 返回WTNS格式见证值
- * 5. 使用生成的见证值继续后续的证明生成流程
- */
-
 module.exports = async function builder(code, options) {
 
     options = options || {};
