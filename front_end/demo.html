@@ -48,7 +48,7 @@
             padding: 2rem;
             border-radius: 10px;
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
-            max-width: 400px;
+            max-width: 900px;
             width: 90%;
             position: relative;
             z-index: 2;
@@ -215,6 +215,101 @@
                     -0.04em -0.025em 0 #fffc00;
             }
         }
+
+        .subtitle {
+            color: #0f0;
+            text-align: left;
+            font-size: 1.2rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #0f0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* 为密码类型的输入框添加特殊样式 */
+        .input-box[type="password"] {
+            letter-spacing: 0.3em;
+        }
+
+        /* 可选：为入和私密输入添加不同的边框颜色 */
+        .subtitle + .content .input-box {
+            border-color: #00ff00; /* 公开输入使用绿色 */
+        }
+
+        .subtitle:nth-of-type(2) + .content .input-box,
+        .subtitle:nth-of-type(2) ~ .content .input-box {
+            border-color: #ff0000; /* 私密输入使用红色 */
+        }
+
+        .input-columns {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .input-column {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .input-column:first-child {
+            border-right: 1px solid rgba(0, 255, 0, 0.2);
+            padding-right: 2rem;
+        }
+
+        .input-column:last-child {
+            padding-left: 2rem;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .input-columns {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .input-column:first-child {
+                border-right: none;
+                border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+                padding-right: 0;
+                padding-bottom: 2rem;
+            }
+
+            .input-column:last-child {
+                padding-left: 0;
+                padding-top: 2rem;
+            }
+
+            .box {
+                padding: 1.5rem;
+            }
+        }
+
+        /* 保持提交按钮在底部居中 */
+        .submit-btn {
+            margin-top: 2rem;
+        }
+
+        .hash-display {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #0f0;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            word-break: break-all;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .hash-display.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -223,15 +318,58 @@
         <div class="box">
             <div class="clown-emoji">🤡</div>
             <h1 class="title glitch-effect">ZK-Identity</h1>
-            <div class="content">
-                <label>Proof content:</label>
-                <input type="text" class="input-box" id="statement">
+            
+            <div class="hash-display" id="hashDisplay"></div>
+            
+            <div class="input-columns">
+                <!-- Left Column: Public Inputs -->
+                <div class="input-column">
+                    <h2 class="subtitle">Public Inputs</h2>
+                    <div class="content">
+                        <label>Root:</label>
+                        <input type="text" class="input-box" id="root">
+                    </div>
+                    <div class="content">
+                        <label>Nullifier Hash:</label>
+                        <input type="text" class="input-box" id="nullifierHash">
+                    </div>
+                    <div class="content">
+                        <label>College ID:</label>
+                        <input type="text" class="input-box" id="collegeId">
+                    </div>
+                    <div class="content">
+                        <label>New Commitment:</label>
+                        <input type="text" class="input-box" id="newcommitment">
+                    </div>
+                </div>
+
+                <!-- Right Column: Private Inputs -->
+                <div class="input-column">
+                    <h2 class="subtitle">Private Inputs</h2>
+                    <div class="content">
+                        <label>Student ID:</label>
+                        <input type="text" class="input-box" id="studentId">
+                    </div>
+                    <div class="content">
+                        <label>Secret:</label>
+                        <input type="password" class="input-box" id="secret">
+                    </div>
+                    <div class="content">
+                        <label>Path Elements:</label>
+                        <input type="text" class="input-box" id="pathElements">
+                    </div>
+                    <div class="content">
+                        <label>Path Indices:</label>
+                        <input type="text" class="input-box" id="pathIndices">
+                    </div>
+                    <div class="content">
+                        <label>Nullifier:</label>
+                        <input type="text" class="input-box" id="nullifier">
+                    </div>
+                </div>
             </div>
-            <div class="content">
-                <label>Proof:</label>
-                <input type="text" class="input-box" id="proof">
-            </div>
-            <button class="submit-btn" id="submitBtn">Submit</button>
+            
+            <button class="submit-btn" id="proofButton">Generate Proof</button>
         </div>
     </div>
     <a href="https://github.com/oftiyf/ZK-Identity/" target="_blank" class="github-icon">
@@ -241,108 +379,53 @@
     </a>
     <div id="watchingTexts"></div>
 
-    <script>
-        function getRandomOffset() {
-            return (Math.random() - 0.5) * 10 + '%';
-        }
+    <script type="module">
+        import { getInputDataFromForm, generateWitness } from './Gen_proof.js';
 
-        function getRandomRotation() {
-            return (Math.random() - 0.5) * 30;
-        }
+        async function calculatePublicInputsHash() {
+            console.log('Calculating hash...');
 
-        const statementPositions = [
-            { top: '15%', left: '20%' },
-            { top: '15%', left: '80%' },
-            { top: '40%', left: '15%' },
-            { top: '40%', left: '85%' },
-            { top: '65%', left: '25%' },
-            { top: '65%', left: '75%' },
-            { top: '50%', left: '50%' }
-        ];
+            const publicInputs = {
+                root: document.getElementById('root').value,
+                nullifierHash: document.getElementById('nullifierHash').value,
+                collegeId: document.getElementById('collegeId').value,
+                newcommitment: document.getElementById('newcommitment').value
+            };
 
-        const proofPositions = [
-            { top: '20%', left: '30%' },
-            { top: '20%', left: '70%' },
-            { top: '45%', left: '25%' },
-            { top: '45%', left: '75%' },
-            { top: '70%', left: '35%' },
-            { top: '70%', left: '65%' },
-            { top: '35%', left: '50%' }
-        ];
+            console.log('Public inputs:', publicInputs);
 
-        function showText(positions, text, isRed = false) {
-            document.getElementById('watchingTexts').innerHTML = '';
-            
-            positions.forEach((pos, i) => {
-                const textDiv = document.createElement('div');
-                textDiv.className = `watching-text ${isRed ? 'red' : ''}`;
-                textDiv.textContent = text;
-                
-                const actualTop = `calc(${pos.top} + ${getRandomOffset()})`;
-                const actualLeft = `calc(${pos.left} + ${getRandomOffset()})`;
-                const rotation = getRandomRotation();
-                
-                textDiv.style.left = actualLeft;
-                textDiv.style.top = actualTop;
-                textDiv.style.opacity = '0';
-                textDiv.style.transform = `rotate(${rotation}deg)`;
-                
-                document.getElementById('watchingTexts').appendChild(textDiv);
-                
-                setTimeout(() => {
-                    textDiv.style.opacity = '0.7';
-                }, i * 150);
-            });
-        }
+            const inputString = JSON.stringify(publicInputs);
+            const msgBuffer = new TextEncoder().encode(inputString);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-        document.getElementById('statement').addEventListener('focus', function() {
-            showText(statementPositions, 'God is watching you.', false);
-        });
+            console.log('Generated hash:', hashHex);
 
-        document.getElementById('proof').addEventListener('focus', function() {
-            showText(proofPositions, 'Never leak the secret!', true);
-        });
+            const hashDisplay = document.getElementById('hashDisplay');
+            hashDisplay.textContent = `Public Inputs Hash: ${hashHex}`;
+            hashDisplay.classList.add('show');
 
-        document.getElementById('submitBtn').addEventListener('click', function() {
-            const statement = document.getElementById('statement').value;
-            const proof = document.getElementById('proof').value;
-            console.log('Statement:', statement);
-            console.log('Proof:', proof);
-            
-            // Show both messages
-            showText(statementPositions, 'God is watching you.', false);
             setTimeout(() => {
-                showText(proofPositions, 'Never leak the secret!', true);
-            }, 500);
+                hashDisplay.classList.remove('show');
+                console.log('Hash display hidden');
+            }, 1000);
+        }
 
-            // Show and animate the clown emoji
-            const clownEmoji = document.querySelector('.clown-emoji');
-            clownEmoji.style.opacity = '1';
-            
-            // Hide the clown after 3 seconds
-            setTimeout(() => {
-                clownEmoji.style.opacity = '0';
-            }, 3000);
-        });
-
-        let resizeTimeout;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(function() {
-                if(document.getElementById('statement') === document.activeElement) {
-                    showText(statementPositions, 'God is watching you.', false);
-                } else if(document.getElementById('proof') === document.activeElement) {
-                    showText(proofPositions, 'Never leak the secret!', true);
+        // 使用事件监听器而不是全局函数
+        document.addEventListener('DOMContentLoaded', () => {
+            const proofButton = document.getElementById('proofButton');
+            proofButton.addEventListener('click', async () => {
+                console.log('Generate Proof button clicked');
+                try {
+                    await calculatePublicInputsHash();
+                    
+                    const inputData = getInputDataFromForm();
+                    const witness = await generateWitness(inputData);
+                    console.log('Witness generated:', witness);
+                } catch (error) {
+                    console.error('Error generating proof:', error);
                 }
-            }, 250);
-        });
-
-        ['statement', 'proof'].forEach(id => {
-            document.getElementById(id).addEventListener('blur', function() {
-                const texts = document.getElementsByClassName('watching-text');
-                Array.from(texts).forEach(text => {
-                    text.style.opacity = '0';
-                });
             });
         });
     </script>
