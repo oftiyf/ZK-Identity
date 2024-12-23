@@ -19,7 +19,7 @@
 - 基于Circom实现核心电路
 - 智能合约验证整合，实现链上验证逻辑。
 ### 前端
-![alt text](image.png)
+![alt text](./public/image.png)
 
 ### 前端贡献流程
 
