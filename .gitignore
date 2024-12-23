@@ -29,3 +29,8 @@ dist/
 # Environment variables
 .env
 .env.local
+
+
+# Node modules
+node_modules/
+**/node_modules
