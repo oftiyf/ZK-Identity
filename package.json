@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "front_end",
-    "contracts",
-    "circuits"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "web:dev": "pnpm --filter @zk-identity/web dev",
+    "web:build": "pnpm --filter @zk-identity/web build",
+    "web:preview": "pnpm --filter @zk-identity/web preview",
+    "web:lint": "pnpm --filter @zk-identity/web lint"
   },
   "keywords": [],
   "author": "",

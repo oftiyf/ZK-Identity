@@ -1,5 +1,5 @@
-import { WitnessCalculator } from '../circuits/student_js/witness_calculator.js';
-import { generateWitness } from '../circuits/student_js/generate_witness.js';
+import { WitnessCalculator } from '@zk-identity/circuits/student_js/witness_calculator.js';
+import { generateWitness } from '@zk-identity/circuits/student_js/generate_witness.js';
 import * as snarkjs from 'snarkjs';
 
 async function main(input) {
