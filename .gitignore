@@ -4,8 +4,6 @@ pot12_*.ptau
 # Circuit compilation outputs
 *.r1cs
 *.sym
-*.wasm
-*.zkey
 
 # Witness files
 *.wtns
