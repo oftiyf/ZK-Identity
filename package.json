@@ -1,7 +1,12 @@
 {
-  "name": "student-verify",
+  "name": "zk-identity",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "front_end",
+    "contracts",
+    "circuits"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

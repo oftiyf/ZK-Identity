@@ -1,0 +1,8 @@
+{
+  "name": "@zk-identity/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "solc": "^0.8.0"
+  }
+} 

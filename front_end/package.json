@@ -1,8 +1,12 @@
 {
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+  "name": "@zk-identity/front-end",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "ethers": "^6.13.4",
+    "web3": "^4.15.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.6"
   }
 } 

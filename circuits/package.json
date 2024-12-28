@@ -1,0 +1,10 @@
+{
+  "name": "@zk-identity/circuits",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "ffjavascript": "^0.3.1"
+  }
+} 
