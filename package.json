@@ -10,6 +10,15 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "circomlib": "^2.0.5"
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "ethers": "^6.13.4",
+    "ffjavascript": "^0.3.1",
+    "solc": "^0.8.0",
+    "web3": "^4.15.0"
+  },
+  "devDependencies": {
+    "rollup": "^4.29.1",
+    "vite": "^6.0.6"
   }
 }

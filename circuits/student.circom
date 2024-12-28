@@ -1,83 +1,139 @@
 pragma circom 2.0.0;
 
-include "../node_modules/circomlib/circuits/poseidon.circom";
+include "../node_modules/circomlib/circuits/bitify.circom";
+include "../node_modules/circomlib/circuits/mimc.circom";
 include "../node_modules/circomlib/circuits/comparators.circom";
-include "../node_modules/circomlib/circuits/mux1.circom";
 
-template MerkleTreeNode() {
+template HashLeftRight() {
     signal input left;
     signal input right;
     signal output hash;
 
-    component hasher = Poseidon(2);
-    hasher.inputs[0] <== left;
-    hasher.inputs[1] <== right;
+    component hasher = MiMC7(2);
+    hasher.x_in <== left;
+    hasher.k <== right;
     hash <== hasher.out;
 }
 
-template StudentVerifier(merkleTreeDepth) {
-    // 私有输入
-    signal input studentId;    
-    signal input secret;      
-    signal input collegeKey;   
-    signal input merklePathElements[merkleTreeDepth];
-    signal input merklePathIndices[merkleTreeDepth];
-    
-    signal input collegeId;          
-    signal input merkleRoot;        
-    signal input validityTimestamp;   
-    signal output commitment;        
-    signal output nullifier;         
+template MerkleTreeChecker(levels) {
+    signal input leaf;
+    signal input root;
+    signal input pathElements[levels];
+    signal input pathIndices[levels];
 
-    // 1. 计算学生ID的哈希作为叶子节点
-    component leafHasher = Poseidon(1);
-    leafHasher.inputs[0] <== studentId;
-    
-    // 2. 验证merkle路径
-    component nodes[merkleTreeDepth];
-    component muxLeft[merkleTreeDepth];
-    component muxRight[merkleTreeDepth];
-    signal computedHash[merkleTreeDepth + 1];
-    
-    computedHash[0] <== leafHasher.out;
-    
-    for (var i = 0; i < merkleTreeDepth; i++) {
-        nodes[i] = MerkleTreeNode();
-        muxLeft[i] = Mux1();
-        muxRight[i] = Mux1();
-        muxLeft[i].s <== merklePathIndices[i];
-        muxLeft[i].c[0] <== computedHash[i];
-        muxLeft[i].c[1] <== merklePathElements[i];
 
-        muxRight[i].s <== merklePathIndices[i];
-        muxRight[i].c[0] <== merklePathElements[i];
-        muxRight[i].c[1] <== computedHash[i];
-        
-        nodes[i].left <== muxLeft[i].out;
-        nodes[i].right <== muxRight[i].out;
-        
-        computedHash[i + 1] <== nodes[i].hash;
+    component selectors[levels];
+    component hashers[levels];
+
+    signal currentHash[levels + 1];
+    currentHash[0] <== leaf;
+
+    for (var i = 0; i < levels; i++) {
+        selectors[i] = Selector();
+        selectors[i].in[0] <== currentHash[i];
+        selectors[i].in[1] <== pathElements[i];
+        selectors[i].s <== pathIndices[i];
+
+        hashers[i] = HashLeftRight();
+        hashers[i].left <== selectors[i].out[0];
+        hashers[i].right <== selectors[i].out[1];
+
+        currentHash[i + 1] <== hashers[i].hash;
     }
-    
-    computedHash[merkleTreeDepth] === merkleRoot;
-    component collegeVerifier = Poseidon(2);
-    collegeVerifier.inputs[0] <== studentId;
-    collegeVerifier.inputs[1] <== collegeKey;
 
-    component commitmentHasher = Poseidon(2);
-    commitmentHasher.inputs[0] <== studentId;
-    commitmentHasher.inputs[1] <== secret;
-    commitment <== commitmentHasher.out;
-
-    component nullifierHasher = Poseidon(2);
-    nullifierHasher.inputs[0] <== secret;
-    nullifierHasher.inputs[1] <== commitment;
-    nullifier <== nullifierHasher.out;
-
-    component timeCheck = GreaterEqThan(32);
-    timeCheck.in[0] <== validityTimestamp;
-    timeCheck.in[1] <== 0;
-    timeCheck.out === 1;
+    root === currentHash[levels];
 }
 
-component main {public [collegeId, merkleRoot, validityTimestamp]} = StudentVerifier(4);
+template Selector() {
+    signal input in[2];
+    signal input s;
+    signal output out[2];
+
+    s * (1 - s) === 0;
+    out[0] <== (in[1] - in[0])*s + in[0];
+    out[1] <== (in[0] - in[1])*s + in[1];
+}
+
+
+template MiMC7Hash3() {
+    //实际上是hash(hash(secret,studentid),nullifier)
+    signal input in1;//secret
+    signal input in2;//studentid
+    signal input in3;//nullifier
+    signal output out;
+
+    // 第一次哈希：hash(in1, in2)
+    component hasher1 = MiMC7(2);
+    hasher1.x_in <== in1;
+    hasher1.k <== in2;
+
+    // 第二次哈希：hash(hash(in1, in2), in3)
+    component hasher2 = MiMC7(2);
+    hasher2.x_in <== hasher1.out;
+    hasher2.k <== in3;
+
+    // 输出最终哈希值
+    out <== hasher2.out;
+}
+
+template CommitmentHasher() {
+    signal input nullifier;
+    signal input secret;
+    signal input studentid;
+    signal output commitment;
+    signal output nullifierHash;
+
+    // 使用MiMC7计算commitment (commitment = hash(nullifier, secret))
+    component commitmentHasher = MiMC7Hash3();
+    commitmentHasher.in1 <== secret;
+    commitmentHasher.in2 <== studentid;
+    commitmentHasher.in3 <== nullifier;
+    commitment <== commitmentHasher.out;
+
+    // 使用MiMC7计算nullifierHash (nullifierHash = hash(nullifier))
+    component nullifierHasher = MiMC7(2);
+    nullifierHasher.x_in <== nullifier;
+    nullifierHasher.k <== 0;  // 使用0作为第二个输入
+    nullifierHash <== nullifierHasher.out;
+}
+
+template Student(levels) {
+    // 输入的参数和顺序为
+    // root nullifierHash collegeId newcommitment studentId secret pathElements pathIndices nullifier   
+    signal input root;          
+    signal input nullifierHash; 
+    signal input collegeId;  
+    signal input newcommitment; 
+    
+    signal input studentId;
+    signal input secret;
+    signal input pathElements[levels];
+    signal input pathIndices[levels];
+    signal input nullifier;
+//下面检查提供的nullifierhash和隐私输入的nullifier是否正确符合，并生成commitment
+    component hasher = CommitmentHasher();
+    hasher.nullifier <== nullifier;
+    hasher.secret <== secret;
+    hasher.studentid <== studentId;
+    hasher.nullifierHash === nullifierHash;
+// 检查新的commitment不能与旧的commitment相同
+    signal diff;
+    diff <== hasher.commitment - newcommitment;
+
+    component isZero = IsZero();
+    isZero.in <== diff;
+    1 - isZero.out === 1; // 确保diff不为0
+//下面检查是否在哈希树里面
+    component tree = MerkleTreeChecker(levels);
+    tree.leaf <== hasher.commitment;
+    tree.root <== root;
+    for (var i = 0; i < levels; i++) {
+        tree.pathElements[i] <== pathElements[i];
+        tree.pathIndices[i] <== pathIndices[i];
+    }
+
+    signal collegeIdSquare;
+    collegeIdSquare <== collegeId * collegeId;
+}
+
+component main {public [root, nullifierHash, collegeId,newcommitment]} = Student(20);

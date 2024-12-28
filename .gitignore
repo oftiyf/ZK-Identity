@@ -1,17 +1,14 @@
 # Trusted setup files
 *.ptau
 pot12_*.ptau
-
 # Circuit compilation outputs
 *.r1cs
 *.sym
-*.wasm
-*.zkey
 
 # Witness files
 *.wtns
 
-# Node modules
+# # Node modules
 node_modules/
 package-lock.json
 
