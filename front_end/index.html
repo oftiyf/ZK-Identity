@@ -233,7 +233,7 @@
             letter-spacing: 0.3em;
         }
 
-        /* 可选：为入和私密输入添加不同的边框颜色 */
+        /* 可选：为公开输入和私密输入添加不同的边框颜色 */
         .subtitle + .content .input-box {
             border-color: #00ff00; /* 公开输入使用绿色 */
         }
@@ -330,26 +330,27 @@
                         <input type="text" class="input-box" id="root">
                     </div>
                     <div class="content">
-                        <label>Nullifier Hash:</label>
-                        <input type="text" class="input-box" id="nullifierHash">
-                    </div>
-                    <div class="content">
                         <label>College ID:</label>
                         <input type="text" class="input-box" id="collegeId">
                     </div>
                     <div class="content">
                         <label>New Commitment:</label>
-                        <input type="text" class="input-box" id="newcommitment">
+                        <div style="margin-left: 20px;">
+                            <div class="content">
+                                <label>New Nullifier:</label>
+                                <input type="text" class="input-box" id="newnullifier">
+                            </div>
+                            <div class="content">
+                                <label>Student ID:</label>
+                                <input type="text" class="input-box" id="studentid">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Right Column: Private Inputs -->
                 <div class="input-column">
                     <h2 class="subtitle">Private Inputs</h2>
-                    <div class="content">
-                        <label>Student ID:</label>
-                        <input type="text" class="input-box" id="studentId">
-                    </div>
                     <div class="content">
                         <label>Secret:</label>
                         <input type="password" class="input-box" id="secret">
@@ -379,55 +380,6 @@
     </a>
     <div id="watchingTexts"></div>
 
-    <script type="module">
-        import { getInputDataFromForm, generateWitness } from './Gen_proof.js';
-
-        async function calculatePublicInputsHash() {
-            console.log('Calculating hash...');
-
-            const publicInputs = {
-                root: document.getElementById('root').value,
-                nullifierHash: document.getElementById('nullifierHash').value,
-                collegeId: document.getElementById('collegeId').value,
-                newcommitment: document.getElementById('newcommitment').value
-            };
-
-            console.log('Public inputs:', publicInputs);
-
-            const inputString = JSON.stringify(publicInputs);
-            const msgBuffer = new TextEncoder().encode(inputString);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-            console.log('Generated hash:', hashHex);
-
-            const hashDisplay = document.getElementById('hashDisplay');
-            hashDisplay.textContent = `Public Inputs Hash: ${hashHex}`;
-            hashDisplay.classList.add('show');
-
-            setTimeout(() => {
-                hashDisplay.classList.remove('show');
-                console.log('Hash display hidden');
-            }, 1000);
-        }
-
-        // 使用事件监听器而不是全局函数
-        document.addEventListener('DOMContentLoaded', () => {
-            const proofButton = document.getElementById('proofButton');
-            proofButton.addEventListener('click', async () => {
-                console.log('Generate Proof button clicked');
-                try {
-                    await calculatePublicInputsHash();
-                    
-                    const inputData = getInputDataFromForm();
-                    const witness = await generateWitness(inputData);
-                    console.log('Witness generated:', witness);
-                } catch (error) {
-                    console.error('Error generating proof:', error);
-                }
-            });
-        });
-    </script>
+    <script type="module" src="./controller.js"></script>
 </body>
 </html>

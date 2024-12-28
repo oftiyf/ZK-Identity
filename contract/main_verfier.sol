@@ -29,7 +29,7 @@ contract mianverfier is MerkleTree, Groth16Verifier {
         bytes32 _nullifierHash,      // 用于防止双重支付的 nullifier
         uint256 _collegeId,         // 学院ID
         bytes32 _newCommitment,      // 新的承诺值（新的叶子节点）
-        address payable prover   // 接收者地址
+        address payable prover   // 证明者地址
     ) external returns (uint256) {
         // 验证零知识证明
         //root nullifierHash collegeId newcommitment
@@ -49,7 +49,7 @@ contract mianverfier is MerkleTree, Groth16Verifier {
         // 验证merkle树根
         require(getRoot() == uint256(_root), "Invalid root");
         
-        // 验证nullifier是否已使用
+        // 验证nullifier是否已使用，后面这个是newcommitment检查忽略哈希碰撞
         require(!nullifierHashes[_nullifierHash], "The note has been already spent");
         require(!nullifierHashes[_newCommitment], "Used nullifierhashers");
         
