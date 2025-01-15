@@ -1,8 +1,40 @@
 import { useState } from 'react';
 import './demo1.css';
+import { processData } from '../../utils/controller.js';
 
 function App() {
   const [hashDisplay, setHashDisplay] = useState('');
+  type ProcessResult = {
+    solidityInputfinal?: any;  // 根据实际返回值类型调整
+    // 添加其他可能的属性
+  } | undefined;
+  const handleGenerateProof = async () => {
+    const getInputValue = (id: string): string => {
+      const element = document.getElementById(id) as HTMLInputElement | null;
+      if (!element) {
+        throw new Error(`Input element ${id} not found`);
+      }
+      return element.value;
+    };
+
+    try {
+      const inputs = {
+        root: getInputValue('inputRoot'),
+        collegeId: getInputValue('collegeId'),
+        newNullifier: getInputValue('newnullifier'),
+        studentId: getInputValue('studentid'),
+        secret: getInputValue('secret'),
+        pathElements: getInputValue('pathElements'),
+        pathIndices: getInputValue('pathIndices'),
+        nullifier: getInputValue('nullifier')
+      };
+      const result = await processData(inputs) as ProcessResult;
+      setHashDisplay(result ? JSON.stringify(result) : 'Proof generated successfully');
+    } catch (error) {
+      console.error('Error generating proof:', error);
+      setHashDisplay('Error generating proof: ' + (error as Error).message);
+    }
+  };
 
   return (
     <div className="container">
@@ -64,7 +96,7 @@ function App() {
           </div>
         </div>
         
-        <button className="submit-btn" onClick={() => console.log('Generate Proof')}>
+        <button className="submit-btn" onClick={handleGenerateProof}>
           Generate Proof
         </button>
       </div>
