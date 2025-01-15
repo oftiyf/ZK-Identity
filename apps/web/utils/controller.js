@@ -2,7 +2,7 @@ import { buildMimc7 } from './lib/mimc7.js';
 import { main } from './demogen.js';
 import { callProverFunction } from './call.js';
 
-async function processData(indexData) {
+export async function processData(indexData) {
     try {
         // 构建 mimc7
         const mimc7 = await buildMimc7();
